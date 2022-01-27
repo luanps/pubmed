@@ -5,6 +5,7 @@ from subprocess import call
 import logging
 import pdb
 import argparse
+import json
 
 #sys.path.insert(1, os.path.dirname(shutil.which('xtract')))
 #import edirect
@@ -45,48 +46,68 @@ def get_data_path(query):
 def format_data_to_trec(query, data):
     #output format: queryid#docid_textfield
     query_id, query_str = query.split(',')
-  
+ 
+    doc_id_list = list()
     trec_list = list()
+    json_list = list()
     for doc in data:
         splitted_doc = doc.strip().split('\t')
         try:
             doc_id, doc_title, doc_abstract = splitted_doc
-            trec_list.append(f'{query_id}#{doc_id}_title\t{query_str}\t{doc_title}')
-            trec_list.append(f'{query_id}#{doc_id}_abstract\t{query_str}\t{doc_abstract}')
+
+            if doc_id in doc_id_list:
+                continue
+            trec_title = f'{query_id}#{doc_id}_title\t{query_str}\t{doc_title}'
+            trec_abstract = f'{query_id}#{doc_id}_abstract\t{query_str}\t{doc_abstract}'
+            trec_list.append(trec_title)
+            trec_list.append(trec_abstract)
+
+            json_content = f"{doc_title}\n{doc_title} {doc_abstract}"
+            json_list.append({ "id":f'{doc_id}', "contents":json_content })
+
+            doc_id_list.append(doc_id)
         except:
             try:
                 doc_id, doc_title = splitted_doc
-                trec_list.append(f'{query_id}#{doc_id}_title\t{query_str}\t{doc_title}')
+                trec_title = f'{query_id}#{doc_id}_title\t{query_str}\t{doc_title}'
+                trec_list.append(trec_title)
+
+                json_content = f"{doc_title}\n{doc_title}"
+                json_list.append({ "id":f'{doc_id}', "contents":json_content })
+
+                doc_id_list.append(doc_id)
+
             except:
                 logging.info(f'Missing field at document:\n{splitted_doc}')
 
-    return trec_list
+    return trec_list, json_list
        
 
 def save_trec_data_to_file(trec_data, trec_output_path):
-    with open(f'{trec_output_path}', 'w') as f:
+    with open(trec_output_path, 'w') as f:
         for item in trec_data:
             it = item.replace('\n','')
             f.write(f"{it}\n")
+
+
+def save_json_data_to_file(json_data, json_output_path):
+    with open(json_output_path, 'w') as f:
+        for item in json_data:
+            f.write(json.dumps(item) + "\n")
 
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('query_list', type=str, help='''a list of query data, 
                                                      e.g.: 01,sample''')
-    #parser.add_argument('output_filename', type=str, help='''output filename, 
-    #                                    e.g.: formatted_data. The output is
-    #                                    saved into trec/ folder by default ''')
     args = parser.parse_args()
+    output_filename = 'pubmed'
 
-    query_data_path = args.query_list
-    #trec_output_filename = args.output_filename
-    trec_output_filename = args.query_list
-
-    with open(query_data_path,'r') as fil:
+    with open(args.query_list,'r') as fil:
         query_data = fil.readlines()
 
     trec_data_list = list()
+    json_data_list = list()
     for query in query_data:
         logging.info(f'formatting data from query: {query}')
         raw_data_path, formatted_data_path = get_data_path(query)
@@ -94,9 +115,14 @@ if __name__=='__main__':
 
         logging.info(f'converting data to trec')
         formatted_data = read_formatted_data(formatted_data_path)
-        trec_data = format_data_to_trec(query, formatted_data)
+        trec_data, json_data = format_data_to_trec(query, formatted_data)
         trec_data_list.append(trec_data)
+        json_data_list.append(json_data)
 
     trec_data = [i for item in trec_data_list for i in item]
-    trec_output_path = f'trec/{trec_output_filename}'
+    trec_output_path = f'trec/{output_filename}'
     save_trec_data_to_file(trec_data, trec_output_path)
+
+    json_data = [i for item in json_data_list for i in item]
+    json_output_path = f'json/{output_filename}.json'
+    save_json_data_to_file(json_data, json_output_path)
