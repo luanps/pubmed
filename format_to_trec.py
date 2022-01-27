@@ -40,6 +40,8 @@ def get_data_path(query):
     if not os.path.exists(formatted_data_dir):
         os.makedirs(formatted_data_dir)
     formatted_data_path = f'{formatted_data_dir}/{formatted_query_str}.txt'
+    if os.path.exists(formatted_data_path):
+        os.remove(formatted_data_path)
     return raw_data_path, formatted_data_path
 
 
@@ -47,7 +49,6 @@ def format_data_to_trec(query, data):
     #output format: queryid#docid_textfield
     query_id, query_str = query.split(',')
  
-    doc_id_list = list()
     trec_list = list()
     json_list = list()
     for doc in data:
@@ -55,27 +56,22 @@ def format_data_to_trec(query, data):
         try:
             doc_id, doc_title, doc_abstract = splitted_doc
 
-            if doc_id in doc_id_list:
-                continue
             trec_title = f'{query_id}#{doc_id}_title\t{query_str}\t{doc_title}'
             trec_abstract = f'{query_id}#{doc_id}_abstract\t{query_str}\t{doc_abstract}'
             trec_list.append(trec_title)
             trec_list.append(trec_abstract)
 
-            json_content = f"{doc_title}\n{doc_title} {doc_abstract}"
+            json_content = f"{doc_title}\n{doc_abstract}"
             json_list.append({ "id":f'{doc_id}', "contents":json_content })
 
-            doc_id_list.append(doc_id)
         except:
             try:
                 doc_id, doc_title = splitted_doc
                 trec_title = f'{query_id}#{doc_id}_title\t{query_str}\t{doc_title}'
                 trec_list.append(trec_title)
 
-                json_content = f"{doc_title}\n{doc_title}"
+                json_content = f"{doc_title}\n "
                 json_list.append({ "id":f'{doc_id}', "contents":json_content })
-
-                doc_id_list.append(doc_id)
 
             except:
                 logging.info(f'Missing field at document:\n{splitted_doc}')
